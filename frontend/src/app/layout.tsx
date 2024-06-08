@@ -1,30 +1,27 @@
-"use client";
-
 import { Inter } from "next/font/google";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import Providers from "./providers";
+import { cookies } from "next/headers";
+import { SESSION_COOKIE_NAME } from "@/utils/constants";
+import { AuthProvider } from "@/contexts/AuthContext";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
-
-/** Tanstack query client */
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-    },
-  },
-});
 
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  /** The current user session cookie */
+  const session = cookies().get(SESSION_COOKIE_NAME)?.value || null;
+
   return (
     <html lang="en">
-      <QueryClientProvider client={queryClient}>
-        <body className={inter.className}>{children}</body>
-      </QueryClientProvider>
+      <AuthProvider session={session}>
+        <Providers>
+          <body className={inter.className}>{children}</body>
+        </Providers>
+      </AuthProvider>
     </html>
   );
 }
