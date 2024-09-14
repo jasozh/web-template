@@ -4,7 +4,11 @@ import {
   verifyPasswordResetCode,
   confirmPasswordReset,
   applyActionCode,
+  onAuthStateChanged,
+  User,
 } from "firebase/auth";
+import { createSession, removeSession } from "@/actions/auth";
+import { useRouter, usePathname } from "next/navigation";
 
 /**
  * Hook for using a toast to display messages on state changes. Every time
@@ -96,4 +100,40 @@ export const useVerifyActionCode = (auth: Auth, oobcode: string) => {
   }, [auth, oobcode]);
 
   return { error };
+};
+
+/**
+ * Custom Firebase hook for managing user sessions
+ *
+ * @param auth - The Firebase auth instance
+ * @returns The Firebase user that is currently authenticated
+ */
+export const useUserSession = (auth: Auth, InitSession: string | null) => {
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+
+  // Listen for changes to the user session
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        setCurrentUser(user);
+
+        // Create a session with the current user's claims
+        const { claims } = await user.getIdTokenResult();
+        if (claims.user) {
+          createSession("user");
+        } else if (claims.admin) {
+          createSession("admin");
+        } else {
+          createSession("authenticated");
+        }
+      } else {
+        setCurrentUser(null);
+        removeSession();
+      }
+    });
+
+    return () => unsubscribe();
+  }, [auth]);
+
+  return currentUser;
 };

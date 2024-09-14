@@ -1,5 +1,9 @@
-import { NextResponse, NextRequest } from "next/server";
-import auth from "./utils/firebase";
+import { type NextRequest, NextResponse } from "next/server";
+import {
+  HOME_ROUTE,
+  LOGIN_ROUTE,
+  SESSION_COOKIE_NAME,
+} from "@/utils/constants";
 
 /**
  * Takes a URL path and converts it into a matching regex
@@ -54,85 +58,104 @@ const routes = {
   ],
 
   /** Users can access */
-  userPaths: ["/posts"],
+  userPaths: ["/about"],
 
   /** Users can access only in certain conditions; admins can access */
-  userRestrictedPaths: ["/users/:userid", "/posts/:postid"],
+  userRestrictedPaths: ["/users/:userid"],
 
   /** Admins can access */
-  adminPaths: ["/dashboard", "/users", "/website"],
+  adminPaths: ["/dashboard"],
 
   /** Anyone can access */
-  publicPaths: ["/", "about"],
+  publicPaths: ["/"],
 };
 
-/** Middleware that runs for every protected route */
-export const middleware = async (request: NextRequest) => {
+export const middleware = (request: NextRequest) => {
+  /**
+   * The current session cookie
+   *
+   * NOTE: the value of the cookie represents the custom claim of the user. For
+   * example, a cookie value "user" means user-level permissions while a cookie
+   * value "admin" means admin-level permissions.
+   */
+  const authenticated = request.cookies.get(SESSION_COOKIE_NAME)?.value
+    ? true
+    : false;
+  const claims = request.cookies.get(SESSION_COOKIE_NAME)?.value || "";
+
   /** URL path */
   const path = request.nextUrl.pathname;
 
-  // Get token and claims
-  const { token, claims } = auth.currentUser
-    ? await auth.currentUser.getIdTokenResult()
-    : { token: null, claims: null };
+  // Define redirects
+  const redirectLogin = NextResponse.redirect(
+    new URL(LOGIN_ROUTE, request.nextUrl.origin)
+  );
+  const redirectHome = NextResponse.redirect(
+    new URL(HOME_ROUTE, request.nextUrl.origin)
+  );
 
   switch (true) {
     // Auth paths
+    // - Public : YES
+    // - Users  : NO
+    // - Admins : NO
     case match(path, routes.authPaths):
-      // If user is logged in, redirect to About
-      if (token) {
-        return NextResponse.redirect(new URL("/about", request.url));
+      if (authenticated) {
+        return redirectHome;
       }
-      // Everyone else can access
       break;
 
     // User paths
+    // - Public : NO
+    // - Users  : YES
+    // - Admins : YES
     case match(path, routes.userPaths):
-      // If user is not logged in, redirect to Login
-      if (!token) {
-        return NextResponse.redirect(new URL("/auth/login", request.url));
+      if (!authenticated) {
+        return redirectLogin;
       }
-      // Everyone else can access
       break;
 
     // User restricted paths
+    // - Public : NO
+    // - Users  : YES (in some cases)
+    // - Admins : YES
     case match(path, routes.userRestrictedPaths):
-      // If user is not logged in, redirect to Login
-      if (!token) {
-        return NextResponse.redirect(new URL("/auth/login", request.url));
-      }
-      // If user token and trying to access a user profile, check for access
-      else if (token && claims?.user && match(path, "/users/:userid")) {
-        console.log("check for access");
-      }
-      // If user token and trying to access a post, check for access
-      else if (token && claims?.user && match(path, "/posts/:postid")) {
+      if (!authenticated) {
+        return redirectLogin;
+      } else if (
+        authenticated &&
+        claims?.user &&
+        match(path, "/users/:userid")
+      ) {
         console.log("check for access");
       }
       // Everyone else can access
       break;
 
     // Admin paths
+    // - Public : NO
+    // - Users  : NO
+    // - Admins : YES
     case match(path, routes.adminPaths):
-      // If user is not logged in, redirect to Login
-      if (!token) {
-        return NextResponse.redirect(new URL("/auth/login", request.url));
+      if (!authenticated) {
+        return redirectLogin;
+      } else if (authenticated && !claims?.admin) {
+        return redirectHome;
       }
-      // If user is logged in but not admin, redirect to About
-      else if (token && !claims?.admin) {
-        return NextResponse.redirect(new URL("/about", request.url));
-      }
-      // Everyone else can access
       break;
 
     // Public paths
+    // - Public : YES
+    // - Users  : YES
+    // - Admins : YES
     case match(path, routes.publicPaths):
-      // Everyone else can access
       break;
 
     // Default case
+    // - Public : YES
+    // - Users  : YES
+    // - Admins : YES
     default:
-      // Everyone else can access
       break;
   }
 };

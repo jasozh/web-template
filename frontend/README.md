@@ -75,7 +75,7 @@ If you are interested in recreating the project template from scratch, the comma
 
 7.  Run `npx prettier --write .` to standardize formatting and indentation across all files.
 
-8.  Change `tailwind.config.ts` to add Flowbite as a plugin, include the JS files from Flowbite React, and enable dark mode based on device setting:
+8.  To configure Flowbite, see the [documentation](https://flowbite.com/docs/getting-started/next-js/). Change `tailwind.config.ts` to add Flowbite as a plugin, include the JS files from Flowbite React, and enable dark mode based on device setting:
 
     ```jsx
     import type { Config } from "tailwindcss";
@@ -113,25 +113,62 @@ If you are interested in recreating the project template from scratch, the comma
     }
     ```
 
-10. Update the root `layout.tsx` file to incorporate TanStack Query:
+10. To incorporate TanStack Query, see the [documentation](https://tanstack.com/query/latest/docs/framework/react/guides/advanced-ssr). First create `app/providers.tsx` with the following:
 
     ```jsx
-    "use client"
+    "use client";
 
-    import { Inter } from "next/font/google";
+    // Since QueryClientProvider relies on useContext under the hood, we have to put 'use client' on top
     import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+    import { ReactNode } from "react";
+
+    function makeQueryClient() {
+      return new QueryClient({
+        defaultOptions: {
+          queries: {
+            refetchOnWindowFocus: false,
+          },
+        },
+      });
+    }
+
+    let browserQueryClient: QueryClient | undefined = undefined;
+
+    function getQueryClient() {
+      if (typeof window === "undefined") {
+        // Server: always make a new query client
+        return makeQueryClient();
+      } else {
+        // Browser: make a new query client if we don't already have one
+        // This is very important, so we don't re-make a new client if React
+        // suspends during the initial render. This may not be needed if we
+        // have a suspense boundary BELOW the creation of the query client
+        if (!browserQueryClient) browserQueryClient = makeQueryClient();
+        return browserQueryClient;
+      }
+    }
+
+    export default function Providers({ children }: { children: ReactNode }) {
+      // NOTE: Avoid useState when initializing the query client if you don't
+      //       have a suspense boundary between this and the code that may
+      //       suspend because React will throw away the client on the initial
+      //       render if it suspends and there is no boundary
+      const queryClient = getQueryClient();
+
+      return (
+        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      );
+    }
+    ```
+
+11. Now, update the root `layout.tsx` file to include the `<Providers>` component:
+
+    ```jsx
+    import { Inter } from "next/font/google";
+    import Providers from "./providers";
     import "./globals.css";
 
     const inter = Inter({ subsets: ["latin"] });
-
-    /** Tanstack query client */
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          refetchOnWindowFocus: false,
-        },
-      },
-    });
 
     export default function RootLayout({
       children,
@@ -140,15 +177,15 @@ If you are interested in recreating the project template from scratch, the comma
     }>) {
       return (
         <html lang="en">
-          <QueryClientProvider client={queryClient}>
+          <Providers>
             <body className={inter.className}>{children}</body>
-          </QueryClientProvider>
+          </Providers>
         </html>
       );
     }
     ```
 
-11. Congratulations! You now have a fully functioning Next.js app. Beyond this point, this template provides pages, components, and utils specified below.
+12. Congratulations! You now have a fully functioning Next.js app. Beyond this point, this template provides pages, components, and utils specified below.
 
 ## Folder structure
 

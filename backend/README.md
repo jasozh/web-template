@@ -92,7 +92,7 @@ If you are interested in recreating the project template from scratch, the comma
         @types/supertest
     ```
 
-7.  Add Prisma ORM
+7.  To add Prisma ORM, see the [documentation](https://www.prisma.io/docs/getting-started/setup-prisma/start-from-scratch/relational-databases-typescript-postgresql). Install and initialize Prisma:
 
     ```bash
     # Install Prisma
@@ -105,7 +105,7 @@ If you are interested in recreating the project template from scratch, the comma
     yarn add @prisma/client
     ```
 
-8.  Configure Jest testing by creating `jest.config.js` in the root directory:
+8.  To add Jest testing, see the [documentation](https://jestjs.io/docs/getting-started). Configure Jest testing by creating `jest.config.js` in the root directory:
 
     ```js
     /** @type {import("ts-jest").JestConfigWithTsJest} */
